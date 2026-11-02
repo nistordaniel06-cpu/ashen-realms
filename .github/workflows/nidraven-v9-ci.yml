@@ -16,15 +16,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Verify server source is present
+        run: |
+          for f in package.json server.js social.js db-postgres.js save-queue.js test-v8.js test-perms.js test-social.js test-save-queue.js test-save-queue-extra.js; do
+            if [ ! -f "$f" ]; then
+              echo "::error file=server/$f::Required server file missing from GitHub branch"
+              exit 1
+            fi
+          done
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
       - name: Check syntax
         run: |
           node --check server.js
           node --check social.js
           node --check db-postgres.js
           node --check save-queue.js
-      - name: Run unit and protocol tests
+      - name: Run tests
         run: npm test
