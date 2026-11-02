@@ -1,0 +1,27 @@
+# Render Blueprint — doar plan GRATUIT, regiune Frankfurt. Secretele se setează în dashboard (sync:false), nu aici.
+services:
+  - type: web
+    name: nidraven-server
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: feature/v8-multiplayer-server
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /ready
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: STATIC_FILE
+        value: nidraven.html
+      - key: DB_SCHEMA
+        value: nidraven_game
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FOUNDER_ACCOUNT
+        sync: false
+      - key: FOUNDER_SETUP_CODE
+        sync: false

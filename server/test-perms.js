@@ -1,0 +1,25 @@
+'use strict';
+const P=require('./permissions.js'),WebSocket=require('ws'),os=require('os'),path=require('path'),fs=require('fs');
+let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log((c?'  ok   ':'  FAIL ')+m)};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{
+ ok(P.can('FOUNDER','server.config')&&!P.can('ADMINISTRATOR','server.config'),'Founder are server.config, Administrator nu');
+ ok(P.can('MODERATOR','chat.mute')&&!P.can('MODERATOR','player.kick')&&!P.can('PLAYER','chat.mute'),'ierarhie: Moderator mute da, kick nu; Player nimic');
+ ok(P.can('TRIAL_GM','player.kick')&&!P.can('TRIAL_GM','player.teleport')&&P.can('GAME_MASTER','player.teleport'),'Trial GM kick, GM teleport');
+ ok(!P.can('FOUNDER','inexistent')&&!P.can('HACKER','chat.mute')&&!P.can(undefined,'chat.mute'),'permisiune/rang necunoscut = refuz');
+ ok(!P.canGrantRank('ADMINISTRATOR','FOUNDER')&&!P.canGrantRank('FOUNDER','FOUNDER'),'FOUNDER nu se poate acorda niciodată prin joc');
+ ok(P.canGrantRank('ADMINISTRATOR','GAME_MASTER')&&!P.canGrantRank('HEAD_GM','HEAD_GM')&&!P.canGrantRank('GAME_MASTER','MODERATOR'),'acordare doar spre un rang strict inferior și cu permisiune');
+ ok(P.CONFIRM.has('player.ban')&&P.CONFIRM.has('gold.grant'),'comenzile sensibile cer confirmare (marcate)');
+ process.env.FOUNDER_ACCOUNT='Fondator';process.env.FOUNDER_SETUP_CODE='cod-setare-test-123';const {start}=require('./server.js');
+ const dbp=path.join(os.tmpdir(),'perm-'+Date.now()+'.db');const S=await start({port:0,dbPath:dbp,host:'127.0.0.1'});
+ const mk=()=>new Promise(r=>{const ws=new WebSocket('ws://127.0.0.1:'+S.port);ws.m=[];ws.on('message',d=>ws.m.push(JSON.parse(d)));ws.on('open',()=>r(ws))});
+ const a=await mk(),b=await mk();
+ a.send(JSON.stringify({t:'reg',u:'Jucator1',p:'parola-sigura-1'}));const x=await mk();x.send(JSON.stringify({t:'reg',u:'Fondator',p:'parola-impostor-9'}));await sleep(400);ok(!x.m.some(z=>z.t==='auth')&&x.m.some(z=>z.t==='err'),'numele Founder nu poate fi înregistrat de un străin (fără cod de configurare)');b.send(JSON.stringify({t:'reg',u:'Fondator',p:'parola-sigura-2',code:'cod-setare-test-123'}));await sleep(700);
+ const aa=a.m.find(x=>x.t==='auth'),ba=b.m.find(x=>x.t==='auth');
+ ok(aa&&aa.role==='PLAYER','cont obișnuit = PLAYER');ok(ba&&ba.role==='FOUNDER','contul configurat în FOUNDER_ACCOUNT (mediul serverului) = FOUNDER');
+ for(const o of[{t:'role',role:'FOUNDER'},{t:'setrole',role:'FOUNDER'},{t:'reg',u:'Jucator1',role:'FOUNDER',p:'x'},{t:'auth',role:'FOUNDER'},{t:'gm',pw:'admin'}])a.send(JSON.stringify(o));
+ await sleep(300);const row=S.db.raw.prepare('SELECT role FROM accounts WHERE name_lc=?').get('jucator1');ok(row.role==='PLAYER','mesaje client care cer rang (role/setrole/gm/parolă) nu schimbă nimic');
+ const c=await mk();c.send(JSON.stringify({t:'reg',u:'fondator2',p:'parola-sigura-3'}));await sleep(500);ok(c.m.find(x=>x.t==='auth').role==='PLAYER','un nume asemănător nu devine FOUNDER');
+ const tabs=['guilds','guild_members','parties','party_members','titles','character_titles','character_equipment','skins','character_skins','mounts','character_mounts','bp_seasons','bp_progress','currency_ledger'];
+ const have=S.db.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name);ok(tabs.every(t=>have.includes(t)),'tabelele pregătite (guild/party/titluri/echipament/skin/mount/battle pass/ledger test) există în DB');
+ console.log('\nREZULTAT: '+pass+' trecute, '+fail+' eșuate');await S.close();try{fs.unlinkSync(dbp)}catch(e){}process.exit(fail?1:0)})();
