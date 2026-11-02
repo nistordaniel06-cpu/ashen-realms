@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {createSaveQueue}=require('./save-queue');
+(async()=>{
+ const saved=[];let release;
+ const gate=new Promise(r=>release=r);
+ const q=createSaveQueue(async s=>{if(s.id===1&&s.xp===1)await gate;saved.push({...s})});
+ const first=q.enqueue({id:1,xp:1,inv:[{id:'potion',n:1}]});
+ const changed={id:1,xp:2,inv:[{id:'potion',n:2}]};q.enqueue(changed);changed.inv[0].n=999;
+ const other=q.enqueue({id:2,xp:50});
+ await other;assert.equal(saved.find(x=>x.id===2).xp,50);
+ release();await first;await q.flush();
+ assert.equal(saved.find(x=>x.id===1&&x.xp===2).inv[0].n,2);
+ assert.equal(q.pending,0);
+ let resolve;const blocked=new Promise(r=>resolve=r);
+ const stalled=createSaveQueue(()=>blocked);stalled.enqueue({id:3,xp:7});
+ await assert.rejects(stalled.flush({timeoutMs:10}),/timeout/);
+ resolve();await stalled.flush();
+ console.log('save queue extra tests passed');
+})().catch(e=>{console.error(e);process.exitCode=1});
