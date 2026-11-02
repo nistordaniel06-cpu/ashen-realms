@@ -1,0 +1,18 @@
+{
+  "name": "nidraven-server",
+  "version": "9.0.0-beta.3",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-v8.js && node test-perms.js && node test-social.js && node test-save-queue.js && node test-save-queue-extra.js",
+    "test:queue": "node test-save-queue.js && node test-save-queue-extra.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "pg": "^8.13.0"
+  }
+}
